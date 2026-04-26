@@ -2,4 +2,5 @@ node_modules/
 .env
 dist/
 *.log
-.DS_Store
+my-peer-id.txt
+private.pem
