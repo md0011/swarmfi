@@ -1,12 +1,13 @@
 {
   "name": "swarmfi",
   "private": true,
+  "type": "module",
   "workspaces": ["packages/core", "packages/agents/researcher", "packages/agents/strategist", "packages/agents/riskguard", "packages/agents/executor", "packages/ens"],
   "engines": { "node": ">=20" },
   "scripts": {
-    "dev": "concurrently -n R,S,G,E \"node packages/agents/researcher/index.js\" \"node packages/agents/strategist/index.js\" \"node packages/agents/riskguard/index.js\" \"node packages/agents/executor/index.js\" --prefix-colors green,blue,yellow,cyan"
+    "dev": "node index.js"
   },
-  "devDependencies": {
-    "concurrently": "^8.2.2"
+  "dependencies": {
+    "node-fetch": "^3.3.2"
   }
 }
