@@ -3,4 +3,6 @@ node_modules/
 dist/
 *.log
 my-peer-id.txt
-private.pem
+storage-cache.json
+tmp-*.json
+tmp/

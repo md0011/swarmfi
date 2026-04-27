@@ -2,12 +2,25 @@
   "name": "swarmfi",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/core", "packages/agents/researcher", "packages/agents/strategist", "packages/agents/riskguard", "packages/agents/executor", "packages/ens"],
-  "engines": { "node": ">=20" },
+  "workspaces": [
+    "packages/core",
+    "packages/agents/researcher",
+    "packages/agents/strategist",
+    "packages/agents/riskguard",
+    "packages/agents/executor",
+    "packages/ens"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "node index.js"
   },
   "dependencies": {
+    "@0gfoundation/0g-ts-sdk": "^1.2.6",
+    "@0glabs/0g-serving-broker": "^0.7.5",
+    "dotenv": "^17.4.2",
+    "ethers": "^6.16.0",
     "node-fetch": "^3.3.2"
   }
 }
