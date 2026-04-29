@@ -1,14 +1,14 @@
 import { SwarmAgent } from './packages/core/SwarmAgent.js';
 import { storeData, readData } from './packages/core/storage.js';
 import { askLLM } from './packages/core/compute.js';
+import { createTradeWorkflow, executeWorkflow, directTransfer } from './packages/core/keeper.js';
 
 // ── RESEARCHER ──────────────────────────────────────────────────────────
 const researcher = new SwarmAgent('researcher');
 
 async function analyzeMarket() {
-  console.log('[researcher] calling 0G Compute for market analysis...');
+  console.log('[researcher] calling inference for market analysis...');
 
-  // Real AI inference via 0G Compute
   const raw = await askLLM(
     'You are a DeFi market analyst. Always respond with valid JSON only. No explanation.',
     `Analyze the ETH/USDC pair. Current price: $${2800 + Math.floor(Math.random()*400)}.
@@ -17,18 +17,21 @@ async function analyzeMarket() {
 
   let analysis;
   try {
-    // Strip markdown code fences if LLM adds them
-    const clean = raw.replace(/```json|```/g, '').trim();
+    const clean = raw.replace(/\`\`\`json|\`\`\`/g, '').trim();
     analysis = JSON.parse(clean);
   } catch {
-    // Fallback if LLM response isn't clean JSON
-    analysis = { signal: 'PROVIDE_LIQUIDITY', confidence: 0.75, reason: raw.slice(0, 100), tickLower: -887220, tickUpper: 887220 };
+    analysis = {
+      signal: 'PROVIDE_LIQUIDITY',
+      confidence: 0.75,
+      reason: raw.slice(0, 100),
+      tickLower: -887220,
+      tickUpper: 887220
+    };
   }
 
   analysis.tokenPair = 'ETH/USDC';
   analysis.timestamp = Date.now();
 
-  // Store analysis on 0G Storage — decentralized shared memory
   const rootHash = await storeData('latest-analysis', analysis);
   analysis.rootHash = rootHash;
 
@@ -41,12 +44,11 @@ const strategist = new SwarmAgent('strategist');
 strategist.on('MARKET_ANALYSIS', async (msg) => {
   console.log('[strategist] reading analysis from 0G Storage...');
 
-  // Read from 0G Storage using the rootHash sent by researcher
   let analysis;
   try {
     analysis = await readData('latest-analysis');
   } catch {
-    analysis = msg.data; // fallback to AXL payload
+    analysis = msg.data;
   }
 
   const strategy = {
@@ -64,7 +66,6 @@ strategist.on('MARKET_ANALYSIS', async (msg) => {
 
   console.log('[strategist] strategy built:', strategy.action, '| confidence:', strategy.confidence);
 
-  // Store strategy on 0G Storage too
   await storeData('latest-strategy', strategy);
 
   await strategist.send('riskguard', 'APPROVAL_REQUEST', {
@@ -106,18 +107,31 @@ executor.on('EXECUTION_DECISION', async (msg) => {
     return;
   }
 
-  // TODO Day 3: real KeeperHub MCP call
-  const txHash = `0xSIMULATED_${Date.now()}`;
-  console.log(`[executor] EXECUTED ✓`);
+  let result;
+  try {
+    result = await directTransfer(strategy);
+    console.log('[executor] EXECUTED via KeeperHub ✓');
+  } catch (err) {
+    console.warn('[executor] KeeperHub failed:', err.message);
+    result = { txHash: `0xSIMULATED_${Date.now()}`, status: 'simulated' };
+    console.log('[executor] EXECUTED via simulation ✓');
+  }
+
+  const txHash = result.txHash || result.id || `0xUNKNOWN_${Date.now()}`;
+
   console.log(`  tx:         ${txHash}`);
   console.log(`  action:     ${strategy.action}`);
   console.log(`  confidence: ${strategy.confidence}`);
   console.log(`  reason:     ${strategy.reason}`);
   console.log(`  approvedBy: ${approvedBy}`);
+  console.log(`  via:        ${result.status === 'simulated' ? 'simulation' : 'KeeperHub'}`);
 
-  // Store execution log on 0G Storage
   await storeData('latest-execution', {
-    txHash, strategy, approvedBy, executedAt: Date.now()
+    txHash,
+    strategy,
+    approvedBy,
+    executedAt: Date.now(),
+    via: result.status
   });
 });
 
@@ -128,7 +142,7 @@ async function main() {
   await riskguard.init();
   await executor.init();
 
-  console.log('\n🚀 SwarmFi Day 2 — 0G Storage + Compute online\n');
+  console.log('\n🚀 SwarmFi Day 3 — KeeperHub execution layer online\n');
 
   const run = async () => {
     try {
@@ -142,7 +156,7 @@ async function main() {
 
   setTimeout(async () => {
     await run();
-    setInterval(run, 60_000); // every 60s (0G uploads cost tokens, so slower)
+    setInterval(run, 60_000);
   }, 1000);
 }
 
