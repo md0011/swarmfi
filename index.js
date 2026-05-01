@@ -1,7 +1,8 @@
 import { SwarmAgent } from './packages/core/SwarmAgent.js';
 import { storeData, readData } from './packages/core/storage.js';
 import { askLLM } from './packages/core/compute.js';
-import { createTradeWorkflow, executeWorkflow, directTransfer } from './packages/core/keeper.js';
+import { directTransfer } from './packages/core/keeper.js';
+import { pushEvent } from './packages/core/dashboard.js';
 
 // ── RESEARCHER ──────────────────────────────────────────────────────────
 const researcher = new SwarmAgent('researcher');
@@ -17,7 +18,7 @@ async function analyzeMarket() {
 
   let analysis;
   try {
-    const clean = raw.replace(/\`\`\`json|\`\`\`/g, '').trim();
+    const clean = raw.replace(/```json|```/g, '').trim();
     analysis = JSON.parse(clean);
   } catch {
     analysis = {
@@ -34,6 +35,14 @@ async function analyzeMarket() {
 
   const rootHash = await storeData('latest-analysis', analysis);
   analysis.rootHash = rootHash;
+
+  // Push to dashboard
+  await pushEvent('researcher', 'ANALYSIS', {
+    signal: analysis.signal,
+    confidence: analysis.confidence,
+    reason: analysis.reason,
+    rootHash
+  });
 
   return analysis;
 }
@@ -68,6 +77,13 @@ strategist.on('MARKET_ANALYSIS', async (msg) => {
 
   await storeData('latest-strategy', strategy);
 
+  await pushEvent('strategist', 'STRATEGY', {
+    action: strategy.action,
+    confidence: strategy.confidence,
+    tokenIn: strategy.tokenIn,
+    tokenOut: strategy.tokenOut,
+  });
+
   await strategist.send('riskguard', 'APPROVAL_REQUEST', {
     strategy,
     proposedBy: 'strategist.swarmfi.eth'
@@ -87,6 +103,14 @@ riskguard.on('APPROVAL_REQUEST', async (msg) => {
 
   console.log(`[riskguard] slippage:${slippageOk} amount:${amountOk} confidence:${confidenceOk}`);
   console.log(`[riskguard] decision: ${approved ? '✓ APPROVED' : '✗ REJECTED'}`);
+
+  await pushEvent('riskguard', approved ? 'APPROVED' : 'REJECTED', {
+    approved,
+    slippageOk,
+    amountOk,
+    confidenceOk,
+    strategy: strategy.action
+  });
 
   await riskguard.send('executor', 'EXECUTION_DECISION', {
     approved,
@@ -117,21 +141,23 @@ executor.on('EXECUTION_DECISION', async (msg) => {
     console.log('[executor] EXECUTED via simulation ✓');
   }
 
-  const txHash = result.txHash || result.id || `0xUNKNOWN_${Date.now()}`;
+  const txHash = result.txHash || result.executionId || `0xUNKNOWN_${Date.now()}`;
 
   console.log(`  tx:         ${txHash}`);
   console.log(`  action:     ${strategy.action}`);
   console.log(`  confidence: ${strategy.confidence}`);
-  console.log(`  reason:     ${strategy.reason}`);
   console.log(`  approvedBy: ${approvedBy}`);
-  console.log(`  via:        ${result.status === 'simulated' ? 'simulation' : 'KeeperHub'}`);
+
+  await pushEvent('executor', 'EXECUTED', {
+    txHash,
+    action:     strategy.action,
+    confidence: strategy.confidence,
+    approvedBy,
+    via: result.status || 'keeperhub'
+  });
 
   await storeData('latest-execution', {
-    txHash,
-    strategy,
-    approvedBy,
-    executedAt: Date.now(),
-    via: result.status
+    txHash, strategy, approvedBy, executedAt: Date.now(), via: result.status
   });
 });
 
@@ -142,7 +168,7 @@ async function main() {
   await riskguard.init();
   await executor.init();
 
-  console.log('\n🚀 SwarmFi Day 3 — KeeperHub execution layer online\n');
+  console.log('\n🚀 SwarmFi — all systems online\n');
 
   const run = async () => {
     try {
