@@ -3,6 +3,7 @@ import { storeData, readData } from './packages/core/storage.js';
 import { askLLM } from './packages/core/compute.js';
 import { directTransfer } from './packages/core/keeper.js';
 import { pushEvent } from './packages/core/dashboard.js';
+import { isAgentTrusted } from './packages/core/ens.js';
 
 // ── RESEARCHER ──────────────────────────────────────────────────────────
 const researcher = new SwarmAgent('researcher');
@@ -95,6 +96,16 @@ const riskguard = new SwarmAgent('riskguard');
 
 riskguard.on('APPROVAL_REQUEST', async (msg) => {
   const { strategy } = msg.data;
+
+  // ENS trust verification — functional, not cosmetic
+  const senderName = msg.from || 'strategist';
+  const trusted = await isAgentTrusted(senderName);
+  if (!trusted) {
+    console.log(`[riskguard] REJECTED — ${senderName}.swarmfi.eth not trusted`);
+    await pushEvent('riskguard', 'REJECTED', { reason: 'ENS trust check failed', sender: senderName });
+    return;
+  }
+  console.log(`[riskguard] ENS trust verified for ${senderName}.swarmfi-ai.eth`);
 
   const slippageOk   = strategy.slippagePct <= 1.0;
   const amountOk     = BigInt(strategy.amountIn) <= BigInt('10000000000');

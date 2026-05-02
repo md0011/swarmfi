@@ -106,7 +106,7 @@ export default function Home() {
           }} />
         </div>
         <div style={{ fontSize: '11px', color: '#444', letterSpacing: '0.1em' }}>
-          4 AGENTS · GENSYN AXL · 0G STORAGE · KEEPERHUB
+          4 AGENTS · GENSYN AXL · 0G STORAGE · KEEPERHUB · ENS
         </div>
       </div>
 
