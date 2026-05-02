@@ -258,7 +258,7 @@ node scripts/rogueAgent.js
 
 ## Live Dashboard
 
-The dashboard at `https://swarmfi.vercel.app` shows:
+The dashboard at `https://swarmfi-ai.vercel.app` shows:
 - Real-time event feed from all 4 agents
 - Stats: analyses, approvals, rejections, executions
 - Agent swarm map with ENS identities
